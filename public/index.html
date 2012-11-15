@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <link type="text/css" rel="stylesheet" href="css/style.css"/>
+    <style type="text/css">
+
+circle.node {
+  cursor: pointer;
+  stroke: #000;
+  stroke-width: .5px;
+	fill:white;
+}
+
+circle.highlight {
+	fill:red;
+}
+
+circle.highlight-child {
+	fill:red;
+}
+line.link {
+  fill: none;
+  stroke: #9ecae1;
+  stroke-width: .5px;
+}
+
+
+
+#states path {
+  fill: lightgrey;
+  stroke: #fff;
+}
+
+#states circle {
+  fill: white;
+	fill-opacity:0;
+}
+
+#states .highlight {
+	fill : red;
+	fill-opacity : 1;
+	z-index:99999;
+}
+
+#states .highlight-child {
+	fill : orange;
+	fill-opacity : 1;
+	z-index:99998;
+}
+
+#states .highlight-child2 {
+	fill : yellow;
+	fill-opacity : 1;
+	z-index:99997;
+}
+
+#grph rect {
+
+	fill-opacity : .2;
+	fill : grey;
+
+}
+
+#notes {
+	position:absolute;
+	display:inline-block;
+	width:400px;
+	right:0px;
+}
+
+#notes div.title {
+	font-size:18px;
+}
+
+#info {
+	font-size :14px;
+	background-color:#AAA;
+	border-radius:5px;
+	padding:10px;
+}
+
+    </style>
+  </head>
+  <body>
+		<div id="notes">
+			<div class="title">Mathgene</div>
+			<div id="info"></div>
+		</div>
+    <script type="text/javascript" src="d3/d3.js"></script>
+    <script type="text/javascript" src="d3/d3.geom.js"></script>
+    <script type="text/javascript" src="d3/d3.geo.js"></script>
+    <script type="text/javascript" src="d3/d3.layout.js"></script>
+    <script type="text/javascript">
+
+var xy = d3.geo.mercator().translate([561, 56]).scale(1200),//.scale(870),
+    path = d3.geo.path().projection(xy)
+		total = 0;
+
+var vis = d3.select("body")
+  .append("svg:svg")
+    .attr("width", w)
+    .attr("height", h);
+
+map = vis.append("svg:g")
+    .attr("id", "states")
+		.attr("transform","translate(0,1000)");
+
+d3.json("world-countries.json", function(collection) {
+
+
+  d3.select("#states")
+    .selectAll("path")
+      .data(collection.features)
+    .enter().append("svg:path")
+      .attr("d", path);
+
+	d3.json("schoolcode.json", function(json) {
+		for (var a in json) {
+			schools.push({ 'school' : a, 'lat' : json[a].lat, 'lng' : json[a].lng});
+		}
+		update();
+	});
+
+});
+
+
+var schools =[];
+var update = function() {
+	var dotsEnter = map.selectAll("dots")
+						.data(schools)
+						.enter().append("svg:g")
+							.attr("class",function(d) { return "gdots "+makeClassName(d.school) })
+							.attr("transform", function(d) {
+								var cord = [d.lng, d.lat];
+								return "translate(" + xy(cord).join(",") + ")"
+							});
+
+						dotsEnter.append("svg:circle")
+							.attr("stroke-width", "none")
+							.attr("fill", "white")
+							.attr("r", 0)
+							.attr("class", "dots")
+							.attr("fill-opacity", 0)
+
+							.transition()
+								.duration(500)
+								.attr("r", function(d) {return 5})
+								.attr("fill-opacity", 0);
+
+					vis.selectAll(".dots_tot")
+						.data(schools)
+						.attr("fill", "red")
+						.attr("r", function(d) {return 5 })
+						.attr("class", "dots_tot")
+						.attr("fill-opacity", 0)
+						.attr("stroke", "white")
+						.attr("stroke-opacity", .8)
+						.attr("stroke-width", function(d,i) {
+							return cDay == i ? 2 : 0
+						})
+
+					vis.selectAll(".gdots")
+						.data(schools)
+						.exit()
+						.select(".dots")
+						.transition()
+						.attr("r",5)
+						.duration(500)
+						.remove()
+
+};
+
+
+
+
+
+var w = 1280,
+    h = 800,
+    node,
+    link,
+    root;
+
+var force = d3.layout.force()
+    .on("tick", tick)
+    .charge(function(d) { return d._children ? -d.size / 100 : -30; })
+    .linkDistance(function(d) { return d.target._children ? 100 : 30; })
+    .size([w, h - 160]);
+
+d3.json("gauss", function(json) {
+	root = json;
+	root.fixed = true;
+	root.x = w / 2;
+	root.y = h / 2 - 80;
+	update2();
+});
+
+
+var radius = function(d) {
+
+	return d.children.length ? Math.sqrt(d.children.length * 3) : 2;
+
+}
+
+
+var makeClassName = function(str) {
+
+	return str.replace(/ /g,"")
+						.replace(/&/g,"")
+						.replace(/;/g,"");
+
+}
+
+function update2() {
+
+var grph = vis.append("svg:g")
+	.attr("id", "grph")
+
+
+	grph.append("svg:rect")
+		.attr("width",1200)
+		.attr("height",1000);
+
+
+  var nodes = flatten(root),
+      links = d3.layout.tree().links(nodes);
+
+  // Restart the force layout.
+  force
+      .nodes(nodes)
+      .links(links)
+      .start();
+
+  // Update the links…
+  link = grph.selectAll("line.link")
+      .data(links, function(d) { return d.target.id; });
+
+  // Enter any new links.
+  link.enter().insert("svg:line", ".node")
+      .attr("class", "link")
+      .attr("x1", function(d) { return d.source.x; })
+      .attr("y1", function(d) { return d.source.y; })
+      .attr("x2", function(d) { return d.target.x; })
+      .attr("y2", function(d) { return d.target.y; });
+
+  // Exit any old links.
+  link.exit().remove();
+
+  // Update the nodes…
+  node = grph.selectAll("circle.node")
+      .data(nodes, function(d) { return d.id; })
+      //.style("fill", color);
+
+  node.transition()
+      .attr("r", radius)
+
+  // Enter any new nodes.
+  node.enter().append("svg:circle")
+      .attr("class", "node")
+			.attr("class", function(d) { return "node "+makeClassName(d.school)})
+      .attr("cx", function(d) { return d.x; })
+      .attr("cy", function(d) { return d.y; })
+      .attr("r", radius)
+      //.style("fill", color)
+      .on("click", click)
+      .call(force.drag);
+
+  // Exit any old nodes.
+	node.exit().remove();
+
+	node.on("mouseover",function(d,i) {
+
+			var school = document.querySelector("."+makeClassName(d.school) + " circle");
+			school.setAttribute("class", school.getAttribute("class") + " highlight");
+			this.setAttribute("class", this.getAttribute("class") + " highlight");
+
+			for (var a=0; a<d.children.length;a++) {
+				if (d.children[a].school != d.school) {
+					var subschool = document.querySelector("."+makeClassName(d.children[a].school) + " circle");
+					subschool.setAttribute("class", subschool.getAttribute("class") + " highlight-child");
+				}
+			}
+
+
+			for (var a=0; a<d.children.length;a++) {
+				for (var b=0; b<d.children[a].children.length;b++) {
+					if (d.children[a].children[b].school != d.school && d.children[a].school != d.children[a].children[b].school ) {
+						var subschool = document.querySelector("."+makeClassName(d.children[a].children[b].school) + " circle");
+						subschool.setAttribute("class", subschool.getAttribute("class") + " highlight-child2");
+					}
+				}
+			}
+			console.log(d);
+			document.getElementById("info").innerHTML = [
+				d.name,
+				d.school,
+				d.dissertation
+			].join("<br>");
+
+	});
+
+	node.on("mouseout",function(d) {
+
+			var school = document.querySelector("."+makeClassName(d.school) + " circle");
+			school.setAttribute("class", school.getAttribute("class").replace("highlight",""));
+			this.setAttribute("class", this.getAttribute("class").replace("highlight",""));
+
+			for (var a=0; a<d.children.length;a++) {
+				if (d.children[a].school != d.school) {
+					var subschool = document.querySelector("."+makeClassName(d.children[a].school) + " circle");
+					subschool.setAttribute("class", subschool.getAttribute("class").replace("highlight-child",""));
+				}
+			}
+
+			for (var a=0; a<d.children.length;a++) {
+				for (var b=0; b<d.children[a].children.length;b++) {
+					if (d.children[a].children[b].school != d.school && d.children[a].school != d.children[a].children[b].school ) {
+						var subschool = document.querySelector("."+makeClassName(d.children[a].children[b].school) + " circle");
+						subschool.setAttribute("class", subschool.getAttribute("class").replace("highlight-child2",""));
+					}
+				}
+			}
+	});
+}
+
+function tick() {
+  link.attr("x1", function(d) { return d.source.x; })
+      .attr("y1", function(d) { return d.source.y; })
+      .attr("x2", function(d) { return d.target.x; })
+      .attr("y2", function(d) { return d.target.y; });
+
+  node.attr("cx", function(d) { return d.x; })
+      .attr("cy", function(d) { return d.y; });
+}
+
+// Color leaf nodes orange, and packages white or blue.
+function color(d) {
+  return d._children ? "#3182bd" : d.children ? "#c6dbef" : "#fd8d3c";
+}
+
+// Toggle children on click.
+function click(d) {
+  if (d.children) {
+    d._children = d.children;
+    d.children = null;
+  } else {
+    d.children = d._children;
+    d._children = null;
+  }
+  update();
+}
+
+// Returns a list of all nodes under the root.
+function flatten(root) {
+  var nodes = [], i = 0;
+
+  function recurse(node) {
+    if (node.children) node.size = node.children.reduce(function(p, v) { return p + recurse(v); }, 0);
+		if (!node.id) node.id = ++i;
+		nodes.push(node);
+    return node.size;
+  }
+
+  root.size = recurse(root);
+  return nodes;
+}
+
+    </script>
+  </body>
+</html>
+
