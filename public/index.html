@@ -19,7 +19,7 @@ circle.highlight {
 circle.highlight-child {
 	fill:red;
 }
-line.link {
+path.link {
   fill: none;
   stroke: #9ecae1;
   stroke-width: .5px;
@@ -31,6 +31,7 @@ line.link {
   fill: lightgrey;
   stroke: #fff;
 }
+
 
 #states circle {
   fill: white;
@@ -99,12 +100,12 @@ var xy = d3.geo.mercator().translate([561, 56]).scale(1200),//.scale(870),
 
 var vis = d3.select("body")
   .append("svg:svg")
-    .attr("width", w)
-    .attr("height", h);
+    .attr("width", 1000)
+    .attr("height", 1000);
 
 map = vis.append("svg:g")
     .attr("id", "states")
-		.attr("transform","translate(0,1000)");
+		.attr("transform","translate(0,500)");
 
 d3.json("world-countries.json", function(collection) {
 
@@ -142,7 +143,6 @@ var update = function() {
 							.attr("r", 0)
 							.attr("class", "dots")
 							.attr("fill-opacity", 0)
-
 							.transition()
 								.duration(500)
 								.attr("r", function(d) {return 5})
@@ -158,7 +158,7 @@ var update = function() {
 						.attr("stroke-opacity", .8)
 						.attr("stroke-width", function(d,i) {
 							return cDay == i ? 2 : 0
-						})
+						});
 
 					vis.selectAll(".gdots")
 						.data(schools)
@@ -167,7 +167,7 @@ var update = function() {
 						.transition()
 						.attr("r",5)
 						.duration(500)
-						.remove()
+						.remove();
 
 };
 
@@ -180,13 +180,13 @@ var w = 1280,
     node,
     link,
     root;
-
+/*
 var force = d3.layout.force()
     .on("tick", tick)
-    .charge(function(d) { return d._children ? -d.size / 100 : -30; })
-    .linkDistance(function(d) { return d.target._children ? 100 : 30; })
+		.charge(function(d) { console.log(d.size); return -10;}) //return d._children ? -d.size / 100 : -30; })
+		.linkDistance(function(d) { return 10; })//return d.target._children ? 100 : 30; })
     .size([w, h - 160]);
-
+*/
 d3.json("gauss", function(json) {
 	root = json;
 	root.fixed = true;
@@ -213,35 +213,54 @@ var makeClassName = function(str) {
 
 function update2() {
 
+
+var diagonal = d3.svg.diagonal.radial().projection(function(d) { return [d.y,d.x / 180* Math.PI]; });
+
+
 var grph = vis.append("svg:g")
 	.attr("id", "grph")
+	.attr("transform","translate(480,480)");
 
 
-	grph.append("svg:rect")
-		.attr("width",1200)
-		.attr("height",1000);
 
 
   var nodes = flatten(root),
-      links = d3.layout.tree().links(nodes);
+			links = d3.layout.tree()
+				.size([600])
+				.sort(function(a,b) {
+					return b.year - a.year;
+				})
+				.links(nodes);
+
+var tm = d3.layout.tree()
+						.size([360,960 / 2 - 120 ]);
+
+//						.separation(function(a,b) { return (a.parent == b.parent ?  1 : 2 ) / a.depth; });
+
+		nodes = tm.nodes(root),
+		links = tm.links(nodes);
+
 
   // Restart the force layout.
+	/*
   force
       .nodes(nodes)
       .links(links)
       .start();
-
+*/
   // Update the links…
   link = grph.selectAll("line.link")
       .data(links, function(d) { return d.target.id; });
 
   // Enter any new links.
-  link.enter().insert("svg:line", ".node")
+  link.enter().insert("svg:path", ".node")
       .attr("class", "link")
-      .attr("x1", function(d) { return d.source.x; })
+			.attr("d",diagonal);
+
+/*		.attr("x1", function(d) { return d.source.x; })
       .attr("y1", function(d) { return d.source.y; })
       .attr("x2", function(d) { return d.target.x; })
-      .attr("y2", function(d) { return d.target.y; });
+      .attr("y2", function(d) { return d.target.y; }); */
 
   // Exit any old links.
   link.exit().remove();
@@ -258,12 +277,13 @@ var grph = vis.append("svg:g")
   node.enter().append("svg:circle")
       .attr("class", "node")
 			.attr("class", function(d) { return "node "+makeClassName(d.school)})
-      .attr("cx", function(d) { return d.x; })
-      .attr("cy", function(d) { return d.y; })
+			.attr("transform",function(d) { return "rotate(" + (d.x - 90) + ")translate(" + d.y +")"})
+      //.attr("cx", function(d) { return d.x; })
+      //.attr("cy", function(d) { return d.y; })
       .attr("r", radius)
       //.style("fill", color)
       .on("click", click)
-      .call(force.drag);
+      //.call(force.drag);
 
   // Exit any old nodes.
 	node.exit().remove();

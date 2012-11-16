@@ -12,7 +12,7 @@ var INSERTED = {};
 
 for (var a=0; a<=355;a++) {
 
-	var data = fs.readFileSync('/tmp/mathgene'+a,'ascii');
+	var data = fs.readFileSync(__dirname + '/data/mathgene'+a,'ascii');
 	var p = JSON.parse(data);
 	//console.log(p);
 	for (var b=0; b<p.length; b++) {
